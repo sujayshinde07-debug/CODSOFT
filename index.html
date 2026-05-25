@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz App - Sujay Shinde</title>
+
+<style>
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(to right, #0f172a, #1e293b);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+/* Card */
+.box {
+    background: #1e293b;
+    padding: 30px;
+    border-radius: 15px;
+    width: 420px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    text-align: center;
+    animation: fadeIn 0.4s ease-in;
+}
+
+@keyframes fadeIn {
+    from {opacity: 0; transform: translateY(15px);}
+    to {opacity: 1; transform: translateY(0);}
+}
+
+/* Inputs */
+input {
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 8px;
+    border: none;
+}
+
+/* Buttons */
+button {
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+    transition: 0.3s;
+}
+
+/* Action buttons */
+.main-btn {
+    background: linear-gradient(to right, #38bdf8, #0ea5e9);
+    color: black;
+}
+
+.main-btn:hover {
+    transform: scale(1.03);
+}
+
+/* Answer buttons */
+#answers button {
+    background: linear-gradient(to right, #38bdf8, #0ea5e9);
+    color: black;
+}
+
+#answers button:hover {
+    transform: scale(1.02);
+}
+
+/* Correct/Wrong */
+.correct { background: #22c55e !important; }
+.wrong { background: #ef4444 !important; }
+
+/* Next button */
+#nextBtn {
+    margin-top: 15px;
+    background: #64748b;
+    color: white;
+}
+
+#nextBtn:hover {
+    background: #475569;
+}
+
+button:disabled {
+    background: gray;
+    cursor: not-allowed;
+}
+
+/* Info text */
+.progress {
+    color: #94a3b8;
+    margin-bottom: 5px;
+}
+
+.timer {
+    color: #facc15;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+hr {
+    margin: 15px 0;
+    opacity: 0.2;
+}
+
+.hidden {
+    display: none;
+}
+</style>
+</head>
+
+<body>
+
+<!-- HOME -->
+<div class="box" id="home">
+    <h2>Quiz App</h2>
+    <p>Create and test your knowledge</p>
+    <button class="main-btn" onclick="showCreate()">Create Quiz</button>
+    <button class="main-btn" onclick="startQuiz()">Take Quiz</button>
+</div>
+
+<!-- CREATE -->
+<div class="box hidden" id="create">
+    <h2>Create Quiz</h2>
+
+    <input id="question" placeholder="Enter question">
+    <input id="opt1" placeholder="Option 1">
+    <input id="opt2" placeholder="Option 2">
+    <input id="opt3" placeholder="Option 3">
+    <input id="opt4" placeholder="Option 4">
+    <input id="correct" placeholder="Correct option (1-4)">
+
+    <button class="main-btn" onclick="addQuestion()">Add Question</button>
+    <button onclick="goHome()">Back</button>
+</div>
+
+<!-- QUIZ -->
+<div class="box hidden" id="quiz">
+    <p id="progress" class="progress"></p>
+    <p id="timer" class="timer"></p>
+    <h2 id="qText"></h2>
+
+    <div id="answers"></div>
+
+    <hr>
+
+    <button id="nextBtn" onclick="nextQuestion()" disabled>Next Question →</button>
+</div>
+
+<!-- RESULT -->
+<div class="box hidden" id="result">
+    <h2 id="scoreText"></h2>
+    <button class="main-btn" onclick="goHome()">Back to Home</button>
+</div>
+
+<script>
+let quiz = [];
+let current = 0;
+let score = 0;
+let answered = false;
+let timeLeft = 30;
+let timerInterval;
+
+/* Navigation */
+function showCreate() {
+    hideAll();
+    document.getElementById("create").classList.remove("hidden");
+}
+
+function goHome() {
+    hideAll();
+    document.getElementById("home").classList.remove("hidden");
+}
+
+function hideAll() {
+    document.querySelectorAll(".box").forEach(b => b.classList.add("hidden"));
+}
+
+/* Add Question */
+function addQuestion() {
+    let q = document.getElementById("question").value;
+    let o1 = document.getElementById("opt1").value;
+    let o2 = document.getElementById("opt2").value;
+    let o3 = document.getElementById("opt3").value;
+    let o4 = document.getElementById("opt4").value;
+    let correctValue = document.getElementById("correct").value;
+
+    if (!q || !o1 || !o2 || !o3 || !o4 || !correctValue) {
+        alert("Fill all fields");
+        return;
+    }
+
+    let correctIndex = correctValue - 1;
+
+    if (correctIndex < 0 || correctIndex > 3) {
+        alert("Correct option must be between 1 and 4");
+        return;
+    }
+
+    quiz.push({
+        question: q,
+        answers: [o1, o2, o3, o4],
+        correct: correctIndex
+    });
+
+    alert("Question Added!");
+
+    document.getElementById("question").value = "";
+    document.getElementById("opt1").value = "";
+    document.getElementById("opt2").value = "";
+    document.getElementById("opt3").value = "";
+    document.getElementById("opt4").value = "";
+    document.getElementById("correct").value = "";
+}
+
+/* Start Quiz */
+function startQuiz() {
+    if (quiz.length === 0) {
+        alert("Add questions first!");
+        return;
+    }
+
+    current = 0;
+    score = 0;
+
+    hideAll();
+    document.getElementById("quiz").classList.remove("hidden");
+
+    loadQuestion();
+}
+
+/* Load Question */
+function loadQuestion() {
+    answered = false;
+    document.getElementById("nextBtn").disabled = true;
+
+    let q = quiz[current];
+
+    document.getElementById("qText").innerText =
+        (current + 1) + ". " + q.question;
+
+    document.getElementById("progress").innerText =
+        `Question ${current + 1} of ${quiz.length}`;
+
+    let html = "";
+    q.answers.forEach((ans, i) => {
+        html += `<button onclick="checkAnswer(${i})">${ans}</button>`;
+    });
+
+    document.getElementById("answers").innerHTML = html;
+
+    startTimer();
+}
+
+/* Timer FIXED */
+function startTimer() {
+    clearInterval(timerInterval);
+    timeLeft = 30;
+    updateTimer();
+
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimer();
+
+        if (timeLeft === 0) {
+            clearInterval(timerInterval);
+            nextQuestion();
+        }
+    }, 1000);
+}
+
+function updateTimer() {
+    document.getElementById("timer").innerText = `Time: ${timeLeft}s`;
+}
+
+/* Check Answer */
+function checkAnswer(i) {
+    if (answered) return;
+
+    answered = true;
+    clearInterval(timerInterval);
+
+    let correctIndex = quiz[current].correct;
+    let buttons = document.querySelectorAll("#answers button");
+
+    buttons.forEach((b, index) => {
+        if (index === correctIndex) b.classList.add("correct");
+        else if (index === i) b.classList.add("wrong");
+    });
+
+    if (i === correctIndex) score++;
+
+    document.getElementById("nextBtn").disabled = false;
+}
+
+/* Next */
+function nextQuestion() {
+    current++;
+    if (current < quiz.length) loadQuestion();
+    else showResult();
+}
+
+/* Result */
+function showResult() {
+    hideAll();
+    document.getElementById("result").classList.remove("hidden");
+
+    let percent = Math.round((score / quiz.length) * 100);
+
+    document.getElementById("scoreText").innerText =
+        `Your Score: ${score}/${quiz.length} (${percent}%)`;
+}
+</script>
+
+</body>
+</html>
